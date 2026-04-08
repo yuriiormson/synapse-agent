@@ -1,0 +1,1 @@
+"""VaultMind application package."""

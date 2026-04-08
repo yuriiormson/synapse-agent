@@ -1,0 +1,28 @@
+services:
+  vaultmind:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      VAULT_PATH: /app/vault
+      INDEX_DB_PATH: /app/data/index.db
+      VOICE_TEMP_DIR: /app/data/voice
+      LLM_API: ${LLM_API:-http://host.docker.internal:8080/v1/chat/completions}
+    volumes:
+      - ${VAULT_HOST_PATH:-./data/vault}:/app/vault
+      - ./data:/app/data
+
+  llama:
+    image: ghcr.io/ggerganov/llama.cpp:server
+    profiles: ["llm"]
+    restart: unless-stopped
+    command:
+      - -m
+      - /models/model.gguf
+      - --port
+      - "8080"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ${LLAMA_MODEL_DIR:-./models}:/models:ro

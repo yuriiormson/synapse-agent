@@ -1,0 +1,5 @@
+PyYAML>=6.0,<7.0
+faster-whisper>=1.0,<2.0
+python-dotenv==1.0.1
+python-telegram-bot==22.0
+requests==2.32.3

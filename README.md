@@ -1,5 +1,12 @@
 # VaultMind
 
+VaultMind is a local second brain that organizes your notes, lets you search them via Telegram, and works fully offline.
+
+- 🧠 Automatic PARA organization
+- 🔍 Fast local search (no vector DB)
+- 🎤 Voice-to-search support
+- ⚡ Minimal LLM usage (fast & cheap)
+
 Works fully offline (local LLM + local speech-to-text).
 No cloud services required.
 

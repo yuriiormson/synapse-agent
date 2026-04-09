@@ -155,7 +155,7 @@ Provide a short grounded answer. Mention uncertainty if the notes do not fully a
 
     return _chat_completion(
         [
-            {"role": "system", "content": build_answer_system_prompt()},
+            {"role": "system", "content": build_answer_system_prompt(query)},
             {"role": "user", "content": prompt},
         ],
         max_tokens=SETTINGS.llm_max_tokens,

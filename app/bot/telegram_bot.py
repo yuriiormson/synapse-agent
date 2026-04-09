@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 import re
 
-from telegram import InputFile, Update
+from telegram import BotCommand, InputFile, Update
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -34,6 +34,17 @@ VOICE_TRANSCRIPTION_TIMEOUT_SECONDS = 180
 
 def _result_fetch_limit() -> int:
     return max(SETTINGS.search_limit, SETTINGS.telegram_result_limit)
+
+
+async def set_commands(application: Application) -> None:
+    commands = [
+        BotCommand("search", "Search notes"),
+        BotCommand("ask", "Ask question over notes"),
+        BotCommand("open", "Open note by number"),
+        BotCommand("sort", "Sort Inbox into PARA"),
+    ]
+    await application.bot.set_my_commands(commands)
+    logger.info("Registered Telegram bot commands.")
 
 
 def _log_user_action(update: Update, command: str) -> None:
@@ -544,7 +555,12 @@ def build_application() -> Application:
         raise RuntimeError("TELEGRAM_TOKEN is not configured.")
 
     SETTINGS.ensure_directories()
-    application = ApplicationBuilder().token(SETTINGS.telegram_token).build()
+    application = (
+        ApplicationBuilder()
+        .token(SETTINGS.telegram_token)
+        .post_init(set_commands)
+        .build()
+    )
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("sort", sort_command))
     application.add_handler(CommandHandler("search", search_command))

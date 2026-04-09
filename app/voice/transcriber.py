@@ -35,6 +35,14 @@ def transcribe_file(path: str) -> str:
         raise RuntimeError("Audio file was not downloaded correctly.")
 
     model = get_model()
-    segments, _ = model.transcribe(audio_path.as_posix())
-    text = " ".join(segment.text.strip() for segment in segments if segment.text.strip())
-    return text.strip()
+    segments, info = model.transcribe(
+        audio_path.as_posix(),
+        beam_size=5,
+        vad_filter=True,
+        vad_parameters={"min_silence_duration_ms": 500},
+        language=None,
+    )
+    text = " ".join(segment.text.strip() for segment in segments if segment.text.strip()).strip()
+    print(f"[VOICE] detected language: {info.language}")
+    print(f"[VOICE] text: {text}")
+    return text

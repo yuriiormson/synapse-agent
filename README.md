@@ -112,7 +112,7 @@ Suggested demo flow:
 2. Send `/search roadmap`
 3. Send `/ask what matters for release`
 4. Send `/open 1`
-5. Drop a markdown note into `data/vault/Inbox/`
+5. Drop a markdown note into `data/vault/Inbox/` or `data/vault/0. Inbox/`
 6. Send `/sort`
 7. Send a voice message that starts with `search ...` or `ask ...`
 
@@ -120,7 +120,7 @@ Suggested demo flow:
 
 - Telegram commands: `/search`, `/ask`, `/open`, `/sort`
 - Ranked local search with snippet previews
-- YAML-first Inbox routing into `Projects`, `Areas`, `Resources`, and `Archives`
+- YAML-first Inbox routing into `Projects` or `1. Projects`, `Areas` or `2. Areas`, `Resources` or `3. Resources`, and `Archives` or `4. Archives`
 - Safe fallback behavior for empty or invalid frontmatter
 - Automatic folder creation only when rules allow it
 - Local voice transcription with Whisper-compatible models
@@ -132,14 +132,14 @@ VaultMind expects a PARA-style vault:
 
 ```text
 Vault/
-├── Inbox/
-├── Projects/
-├── Areas/
-├── Resources/
-└── Archives/
+├── Inbox/ or 0. Inbox/
+├── Projects/ or 1. Projects/
+├── Areas/ or 2. Areas/
+├── Resources/ or 3. Resources/
+└── Archives/ or 4. Archives/
 ```
 
-`Inbox` is temporary intake only. The sorter also tolerates a legacy `0. Inbox` path so older vaults still work.
+VaultMind supports both plain and numbered PARA folder names and resolves whichever version already exists in your vault.
 
 ## Sorting Logic
 

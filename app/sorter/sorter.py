@@ -8,8 +8,9 @@ import shutil
 from app.config import SETTINGS
 from app.search.search import refresh_index
 from app.sorter.classifier import ClassificationResult, classify_note_document
-from app.sorter.rules import default_unsorted_folder, folder_creation_allowed, section_directory
+from app.sorter.rules import default_unsorted_folder, folder_creation_allowed
 from app.utils.file_utils import NoteDocument, build_destination_path, read_note, relative_to_base
+from app.utils.folders import resolve_section_folder
 
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,7 @@ class SortResult:
 
 
 def _resolve_target_dir(classification: ClassificationResult) -> Path:
-    section_dir = SETTINGS.vault_path / section_directory(classification.section)
+    section_dir = resolve_section_folder(SETTINGS.vault_path, classification.section)
     target_dir = section_dir / classification.folder
 
     if target_dir.exists():

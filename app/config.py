@@ -6,6 +6,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from app.utils.folders import PARA_FOLDERS, existing_folders, resolve_folder
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -53,24 +55,20 @@ class Settings:
 
     @property
     def inbox_path(self) -> Path:
-        return self.vault_path / "Inbox"
+        return resolve_folder(self.vault_path, "inbox")
 
     @property
     def inbox_paths(self) -> tuple[Path, ...]:
-        paths: list[Path] = [self.inbox_path]
-        legacy_inbox = self.vault_path / "0. Inbox"
-        if legacy_inbox != self.inbox_path:
-            paths.append(legacy_inbox)
-        return tuple(paths)
+        existing = existing_folders(self.vault_path, "inbox")
+        return existing or (self.inbox_path,)
 
     def ensure_directories(self) -> None:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         self.index_db_path.parent.mkdir(parents=True, exist_ok=True)
         self.voice_temp_dir.mkdir(parents=True, exist_ok=True)
         self.vault_path.mkdir(parents=True, exist_ok=True)
-        self.inbox_path.mkdir(parents=True, exist_ok=True)
-        for section in ("Projects", "Areas", "Resources", "Archives"):
-            (self.vault_path / section).mkdir(parents=True, exist_ok=True)
+        for key in PARA_FOLDERS:
+            resolve_folder(self.vault_path, key)
 
 
 SETTINGS = Settings()

@@ -14,6 +14,12 @@ DATA_DIR = BASE_DIR / "data"
 
 load_dotenv(BASE_DIR / ".env")
 
+LANGUAGES = [
+    lang.strip()
+    for lang in os.getenv("LLM_LANGUAGES", "en,uk").split(",")
+    if lang.strip()
+]
+
 
 @dataclass(slots=True)
 class Settings:
@@ -22,6 +28,7 @@ class Settings:
         "LLM_API", "http://127.0.0.1:8080/v1/chat/completions"
     ).strip()
     llm_model: str = os.getenv("LLM_MODEL", "local-model").strip()
+    llm_languages: tuple[str, ...] = tuple(LANGUAGES)
     telegram_token: str = os.getenv("TELEGRAM_TOKEN", "").strip()
     telegram_allowed_user_ids: tuple[int, ...] = tuple(
         int(value.strip())

@@ -7,6 +7,7 @@ from typing import Any
 import requests
 
 from app.config import SETTINGS
+from app.llm.ask import build_answer_system_prompt
 
 
 logger = logging.getLogger(__name__)
@@ -22,16 +23,6 @@ Rules:
 - tags must be a JSON array of short strings.
 - No markdown fences, no explanations.
 """
-
-ANSWER_SYSTEM_PROMPT = """You are a local second-brain assistant.
-
-Rules:
-- Answer only from the provided notes.
-- If the notes are insufficient, say so briefly.
-- Keep the answer concise and grounded.
-- Do not invent sources or details.
-"""
-
 
 def _extract_content(payload: dict[str, Any]) -> str:
     choices = payload.get("choices")
@@ -164,7 +155,7 @@ Provide a short grounded answer. Mention uncertainty if the notes do not fully a
 
     return _chat_completion(
         [
-            {"role": "system", "content": ANSWER_SYSTEM_PROMPT},
+            {"role": "system", "content": build_answer_system_prompt()},
             {"role": "user", "content": prompt},
         ],
         max_tokens=SETTINGS.llm_max_tokens,

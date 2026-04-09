@@ -23,7 +23,7 @@ from app.search.ranking import SearchResult
 from app.search.search import load_user_session, save_user_session, search
 from app.sorter.sorter import run as run_sorter
 from app.utils.file_utils import chunk_text, extract_title, read_note, relative_to_base
-from app.voice.transcribe import transcribe_audio
+from app.voice.transcriber import transcribe_file
 
 
 logger = logging.getLogger(__name__)
@@ -479,6 +479,7 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     voice_file = await media.get_file()
     suffix = Path(voice_file.file_path or "voice.ogg").suffix or ".ogg"
     target_path = SETTINGS.voice_temp_dir / f"{media.file_unique_id}{suffix}"
+    target_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
         await voice_file.download_to_drive(custom_path=target_path)
@@ -487,10 +488,11 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             update.effective_user.id if update.effective_user else None,
             target_path.name,
         )
-        transcription = await asyncio.wait_for(
-            asyncio.to_thread(transcribe_audio, target_path),
+        text = await asyncio.wait_for(
+            asyncio.to_thread(transcribe_file, target_path.as_posix()),
             timeout=VOICE_TRANSCRIPTION_TIMEOUT_SECONDS,
         )
+        print(f"[VOICE] Transcribed: {text}")
     except asyncio.TimeoutError:
         logger.error(
             "Voice transcription timed out for user %s.",
@@ -528,8 +530,7 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         if target_path.exists():
             target_path.unlink()
 
-    mode, query = _normalize_voice_query(transcription.text)
-    if not query.strip():
+    if not text.strip():
         fallback = _caption_fallback_query(update)
         if fallback is not None:
             await _run_voice_fallback(
@@ -542,6 +543,7 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             await _reply(update, "Could not understand audio.")
         return
 
+    mode, query = _normalize_voice_query(text)
     lead_text = f'Transcript ({mode}): "{query}"'
     if mode == "search":
         await _run_search(update, query, lead_text=lead_text)

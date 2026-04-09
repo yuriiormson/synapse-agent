@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from pathlib import Path
 import re
-
-from app.utils.file_utils import tokenize
 
 
 @dataclass(slots=True)
@@ -33,14 +32,35 @@ class SearchResult:
 
 
 SEPARATOR_PATTERN = re.compile(r"[-_/]+")
+WHITESPACE_PATTERN = re.compile(r"\s+")
 
 
-def _normalize_text(value: str) -> str:
-    return SEPARATOR_PATTERN.sub(" ", (value or "").lower()).strip()
+def normalize(text: str) -> str:
+    normalized = SEPARATOR_PATTERN.sub(" ", (text or "").lower())
+    return WHITESPACE_PATTERN.sub(" ", normalized).strip()
 
 
-def _matches_by_term(text: str, terms: list[str]) -> int:
-    return sum(1 for term in terms if term in text)
+def tokenize(text: str) -> list[str]:
+    return [token for token in normalize(text).split() if token]
+
+
+def similarity(a: str, b: str) -> float:
+    return SequenceMatcher(None, a, b).ratio()
+
+
+def score(query_tokens: list[str], doc_tokens: list[str]) -> float:
+    if not query_tokens or not doc_tokens:
+        return 0.0
+
+    total = 0.0
+    for query_token in query_tokens:
+        best = 0.0
+        for doc_token in doc_tokens:
+            candidate = similarity(query_token, doc_token)
+            if candidate > best:
+                best = candidate
+        total += best
+    return total
 
 
 def _build_preview(text: str, *, max_length: int) -> str:
@@ -48,28 +68,23 @@ def _build_preview(text: str, *, max_length: int) -> str:
     return collapsed[:max_length].strip()
 
 
-def _score_note(query: str, terms: list[str], note: IndexedNote) -> float:
-    phrase = _normalize_text(query)
-    title = _normalize_text(note.title)
-    content = _normalize_text(f"{note.body}\n{note.metadata_text}")
-    tags = [_normalize_text(tag) for tag in note.tags]
+def _score_note(query: str, query_tokens: list[str], note: IndexedNote) -> float:
+    normalized_query = normalize(query)
+    normalized_title = normalize(note.title)
+    title_tokens = tokenize(note.title)
 
-    title_score = 0.0
-    tag_score = 0.0
-    content_score = 0.0
+    tag_tokens: list[str] = []
+    for tag in note.tags:
+        tag_tokens.extend(tokenize(tag))
 
-    if phrase and phrase in title:
-        title_score += 10
-    title_score += _matches_by_term(title, terms) * 3
+    content_tokens = tokenize(f"{note.body}\n{note.metadata_text}")
 
-    for tag in tags:
-        if phrase and phrase in tag:
-            tag_score += 5
-        tag_score += _matches_by_term(tag, terms) * 2
+    title_score = score(query_tokens, title_tokens) * 10
+    tag_score = score(query_tokens, tag_tokens) * 5
+    content_score = score(query_tokens, content_tokens)
 
-    if phrase and phrase in content:
-        content_score += 1
-    content_score += _matches_by_term(content, terms)
+    if normalized_query and normalized_query in normalized_title:
+        title_score += 5
 
     return title_score + tag_score + content_score
 
@@ -82,14 +97,14 @@ def rank_notes(
     limit: int,
     snippet_length: int = 120,
 ) -> list[SearchResult]:
-    terms = tokenize(query)
-    if not terms:
+    query_tokens = tokenize(query)
+    if not query_tokens:
         return []
 
     results: list[SearchResult] = []
     for note in notes:
-        score = _score_note(query, terms, note)
-        if score <= 0:
+        note_score = _score_note(query, query_tokens, note)
+        if note_score <= 0.3:
             continue
 
         snippet_source = note.body or note.metadata_text or note.title
@@ -102,7 +117,7 @@ def rank_notes(
                 folder=note.folder,
                 tags=note.tags,
                 snippet=_build_preview(snippet_source, max_length=snippet_length),
-                score=round(score, 2),
+                score=round(note_score, 2),
                 modified_at=note.modified_at,
             )
         )

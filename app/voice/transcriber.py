@@ -11,6 +11,10 @@ COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
 _model = None
 
 
+def clean_query(text: str) -> str:
+    return (text or "").lower().strip()
+
+
 def get_model():
     global _model
     if _model is None:

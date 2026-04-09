@@ -23,7 +23,7 @@ from app.search.ranking import SearchResult
 from app.search.search import load_user_session, save_user_session, search
 from app.sorter.sorter import run as run_sorter
 from app.utils.file_utils import chunk_text, extract_title, read_note, relative_to_base
-from app.voice.transcriber import transcribe_file
+from app.voice.transcriber import clean_query, transcribe_file
 
 
 logger = logging.getLogger(__name__)
@@ -543,7 +543,8 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             await _reply(update, "Could not understand audio.")
         return
 
-    mode, query = _normalize_voice_query(text)
+    normalized_text = clean_query(text)
+    mode, query = _normalize_voice_query(normalized_text)
     lead_text = f'Transcript ({mode}): "{query}"'
     if mode == "search":
         await _run_search(update, query, lead_text=lead_text)

@@ -17,6 +17,7 @@ from telegram.ext import (
 )
 
 from app.config import SETTINGS
+from app.handlers.inbox import save_to_inbox
 from app.llm.client import answer_query
 from app.search.ranking import SearchResult
 from app.search.search import load_user_session, save_user_session, search
@@ -374,6 +375,30 @@ async def sort_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await _reply_long(update, "\n".join(lines))
 
 
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _guard(update):
+        return
+    _log_user_action(update, "message")
+
+    message = update.effective_message
+    if message is None or not message.text:
+        return
+
+    text = message.text.strip()
+    if not text:
+        return
+
+    try:
+        saved_path = await asyncio.to_thread(save_to_inbox, SETTINGS.vault_path, text)
+    except Exception as exc:  # pragma: no cover - runtime protection
+        logger.error("Failed to save Telegram message to Inbox: %s", exc, exc_info=True)
+        await _reply(update, "Could not save that note to Inbox.")
+        return
+
+    relative_path = relative_to_base(Path(saved_path), SETTINGS.vault_path)
+    await _reply(update, f"Saved to Inbox:\n{relative_path}")
+
+
 async def open_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not await _guard(update):
         return
@@ -525,6 +550,7 @@ def build_application() -> Application:
     application.add_handler(CommandHandler("search", search_command))
     application.add_handler(CommandHandler("ask", ask))
     application.add_handler(CommandHandler("open", open_command))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     application.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, voice_message))
     return application
 

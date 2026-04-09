@@ -21,6 +21,13 @@ from app.utils.file_utils import NoteDocument, ensure_string_list, sanitize_fold
 
 logger = logging.getLogger(__name__)
 
+TAG_RULES = {
+    "Projects": ["project", "build", "startup", "task"],
+    "Areas": ["health", "finance", "personal", "life"],
+    "Resources": ["learning", "article", "guide", "reference"],
+    "Archives": ["archive", "archived", "completed", "done"],
+}
+
 
 @dataclass(slots=True)
 class ClassificationResult:
@@ -60,7 +67,25 @@ def _has_truthy_flag(metadata: dict[str, Any], *keys: str) -> bool:
     return False
 
 
+def _section_from_tag_rules(tags: list[str]) -> str | None:
+    if not tags:
+        return None
+
+    normalized = [str(tag).strip().lower() for tag in tags if str(tag).strip()]
+    for section, keywords in TAG_RULES.items():
+        for tag in normalized:
+            for keyword in keywords:
+                if keyword in tag:
+                    return section
+    return None
+
+
 def _section_from_metadata(metadata: dict[str, Any], tags: list[str]) -> str | None:
+    tag_values = list(dict.fromkeys(tags + normalized_tags(metadata.get("tags"))))
+    routed_from_tags = _section_from_tag_rules(tag_values)
+    if routed_from_tags:
+        return routed_from_tags
+
     explicit = normalize_section(
         _first_value(metadata, "section", "para", "pillar", "bucket", "folder_section")
     )
@@ -86,14 +111,14 @@ def _section_from_metadata(metadata: dict[str, Any], tags: list[str]) -> str | N
     if _first_value(metadata, "resource", "topic", "subject", "source", "reference", "category"):
         return "Resources"
 
-    tag_values = set(tags + normalized_tags(metadata.get("tags")))
-    if tag_values & {"project", "projects"}:
+    tag_value_set = set(tag_values)
+    if tag_value_set & {"project", "projects"}:
         return "Projects"
-    if tag_values & {"area", "areas"}:
+    if tag_value_set & {"area", "areas"}:
         return "Areas"
-    if tag_values & {"resource", "resources", "reference"}:
+    if tag_value_set & {"resource", "resources", "reference"}:
         return "Resources"
-    if tag_values & {"archive", "archived"}:
+    if tag_value_set & {"archive", "archived"}:
         return "Archives"
     return None
 
@@ -162,6 +187,22 @@ def _metadata_route(note: NoteDocument) -> ClassificationResult | None:
             source="metadata",
             used_llm=False,
             reason="valid yaml with deterministic fallback",
+        )
+
+    yaml_tags = normalized_tags(metadata.get("tags"))
+    tag_section = _section_from_tag_rules(yaml_tags)
+    if tag_section:
+        folder = _folder_from_metadata(tag_section, metadata, note)
+        folder_name = sanitize_folder_name(folder, default="") if folder else ""
+        create_folder = bool(folder_name) and folder_creation_allowed(tag_section)
+        return ClassificationResult(
+            section=nearest_valid_section(tag_section),
+            folder=folder_name,
+            create_folder=create_folder,
+            tags=note.tags,
+            source="metadata",
+            used_llm=False,
+            reason="yaml tag route",
         )
 
     section = _section_from_metadata(metadata, note.tags)

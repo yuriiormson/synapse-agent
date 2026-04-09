@@ -184,8 +184,8 @@ def validate_frontmatter(frontmatter: dict[str, Any]) -> list[str]:
 
     type_value = frontmatter.get("type")
     if type_value is None:
-        errors.append("type is required")
-    elif not isinstance(type_value, str):
+        return errors
+    if not isinstance(type_value, str):
         errors.append("type must be a string")
     elif type_value.strip().lower() not in VALID_TYPES:
         errors.append(f"type must be one of: {', '.join(sorted(VALID_TYPES))}")

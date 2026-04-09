@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
-import math
+import re
 
-from app.utils.file_utils import build_snippet, tokenize
+from app.utils.file_utils import tokenize
 
 
 @dataclass(slots=True)
@@ -33,67 +32,46 @@ class SearchResult:
     modified_at: float
 
 
-def _count_matches(text: str, terms: list[str]) -> int:
-    lowered = text.lower()
-    return sum(lowered.count(term) for term in terms)
+SEPARATOR_PATTERN = re.compile(r"[-_/]+")
 
 
-def _recency_score(modified_at: float) -> float:
-    age_days = max(
-        (datetime.now(timezone.utc).timestamp() - modified_at) / 86400,
-        0,
-    )
-    if age_days <= 7:
-        return 2.5
-    if age_days <= 30:
-        return 1.5
-    return max(0.0, 1.0 - math.log10(age_days + 1) / 3)
+def _normalize_text(value: str) -> str:
+    return SEPARATOR_PATTERN.sub(" ", (value or "").lower()).strip()
+
+
+def _matches_by_term(text: str, terms: list[str]) -> int:
+    return sum(1 for term in terms if term in text)
+
+
+def _build_preview(text: str, *, max_length: int) -> str:
+    collapsed = re.sub(r"\s+", " ", (text or "")).strip()
+    return collapsed[:max_length].strip()
 
 
 def _score_note(query: str, terms: list[str], note: IndexedNote) -> float:
-    title = note.title.lower()
-    path = note.path.lower()
-    folder = note.folder.lower()
-    section = note.section.lower()
-    body = note.body.lower()
-    metadata = note.metadata_text.lower()
-    tags = [tag.lower() for tag in note.tags]
+    phrase = _normalize_text(query)
+    title = _normalize_text(note.title)
+    content = _normalize_text(f"{note.body}\n{note.metadata_text}")
+    tags = [_normalize_text(tag) for tag in note.tags]
 
-    phrase = query.lower()
-    keyword_score = 0.0
+    title_score = 0.0
     tag_score = 0.0
-    folder_score = 0.0
+    content_score = 0.0
 
-    keyword_score += _count_matches(title, terms)
-    keyword_score += _count_matches(body, terms)
-    keyword_score += _count_matches(metadata, terms)
+    if phrase and phrase in title:
+        title_score += 10
+    title_score += _matches_by_term(title, terms) * 3
 
-    tag_score += sum(
-        1
-        for term in terms
-        for tag in tags
-        if term in tag
-    )
+    for tag in tags:
+        if phrase and phrase in tag:
+            tag_score += 5
+        tag_score += _matches_by_term(tag, terms) * 2
 
-    folder_score += _count_matches(folder, terms)
-    folder_score += _count_matches(section, terms)
-    folder_score += _count_matches(path, terms)
+    if phrase and phrase in content:
+        content_score += 1
+    content_score += _matches_by_term(content, terms)
 
-    score = keyword_score * 2 + tag_score * 3 + folder_score * 2 + _recency_score(note.modified_at)
-
-    if phrase in title:
-        score += 5
-
-    if phrase == title or phrase == path or phrase == folder:
-        score += 3
-
-    if phrase in metadata:
-        score += 2
-
-    if phrase in body:
-        score += 1
-
-    return score
+    return title_score + tag_score + content_score
 
 
 def rank_notes(
@@ -102,7 +80,7 @@ def rank_notes(
     base_path: Path,
     *,
     limit: int,
-    snippet_length: int = 220,
+    snippet_length: int = 120,
 ) -> list[SearchResult]:
     terms = tokenize(query)
     if not terms:
@@ -123,7 +101,7 @@ def rank_notes(
                 section=note.section,
                 folder=note.folder,
                 tags=note.tags,
-                snippet=build_snippet(snippet_source, terms, max_length=snippet_length),
+                snippet=_build_preview(snippet_source, max_length=snippet_length),
                 score=round(score, 2),
                 modified_at=note.modified_at,
             )

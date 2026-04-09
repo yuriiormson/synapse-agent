@@ -143,7 +143,7 @@ def search(query: str, base_path: str | Path, limit: int = 5) -> list[SearchResu
         notes,
         base,
         limit=limit,
-        snippet_length=SETTINGS.search_snippet_chars,
+        snippet_length=min(SETTINGS.search_snippet_chars, 120),
     )
     logger.info("Search returned %s results for query: %s", len(results), normalized_query)
     return results
